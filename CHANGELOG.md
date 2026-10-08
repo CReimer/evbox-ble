@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2
+
+- Use absolute documentation links in the package README so API, quality, and changelog links work on PyPI.
+- Check README link portability before building and publishing a package.
+
 ## 0.1.1
 
 - Clean up both request and event futures after errors and cancellation to prevent unhandled asynchronous exceptions.
