@@ -27,7 +27,7 @@ quality = ["ruff==0.16.9", "mypy==2.4.0", "build>=1.6.1", "twine>=6.2"]
 packages = ["src/evbox_ble"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src", "tests", "tools", "README.md", "CHANGELOG.md", "QUALITY.md", "LICENSE", "pyproject.toml"]
+include = ["src", "tests", "tools", "README.md", "API.md", "CHANGELOG.md", "QUALITY.md", "LICENSE", "pyproject.toml"]
 
 [tool.coverage.run]
 branch = true
