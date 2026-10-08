@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "evbox-ble"
+version = "0.1.0"
+description = "Asynchronous local BLE communication with EVBox Gen4 chargers"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{name = "Christopher Reimer"}]
+dependencies = ["bleak-retry-connector>=4.7.0", "bleak>=1.0.1"]
+classifiers = ["Framework :: AsyncIO", "Programming Language :: Python :: 3", "Operating System :: OS Independent"]
+
+[project.optional-dependencies]
+test = ["coverage>=7.10"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/evbox_ble"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "README.md", "LICENSE", "pyproject.toml"]
+
+[tool.coverage.run]
+branch = true
+source = ["evbox_ble"]
+
+[tool.coverage.report]
+show_missing = true
