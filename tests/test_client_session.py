@@ -4,7 +4,9 @@ import asyncio
 import json
 import unittest
 from unittest.mock import patch
-from evbox_ble import client as CLIENT_MODULE, protocol as PROTOCOL
+
+from evbox_ble import client as CLIENT_MODULE
+from evbox_ble import protocol as PROTOCOL
 
 
 class _Services:
@@ -169,7 +171,7 @@ class ClientSessionTests(unittest.IsolatedAsyncioTestCase):
         client._connect = connect
         return client
 
-    async def test_server_write_uses_one_ble_login_and_app_order(self):
+    async def test_server_write_uses_one_ble_login_and_app_order(self) -> None:
         fake = FakeBLEClient()
         await self._client(fake).set_server("wss://EU.EVERON.IO/")
         self.assertEqual(
@@ -200,7 +202,7 @@ class ClientSessionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_snapshot_uses_one_authentication_for_configuration_and_diagnostics(
         self,
-    ):
+    ) -> None:
         fake = FakeBLEClient()
         with patch.object(CLIENT_MODULE, "COMMAND_TIMEOUT", 0.001):
             config, diagnostics = await self._client(fake).get_snapshot(["example"])
@@ -213,7 +215,7 @@ class ClientSessionTests(unittest.IsolatedAsyncioTestCase):
         ]
         self.assertEqual(len(logins), 1)
 
-    async def test_false_authorization_payload_stops_before_any_command(self):
+    async def test_false_authorization_payload_stops_before_any_command(self) -> None:
         fake = FakeBLEClient(authorization_result=False)
         with self.assertRaisesRegex(
             CLIENT_MODULE.EVBoxAuthError, "security code was rejected"
@@ -222,12 +224,12 @@ class ClientSessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(fake.actions), 1)
         self.assertEqual(fake.actions[0][0], "DataTransfer")
 
-    async def test_empty_successful_authorization_payload_matches_app_sdk(self):
+    async def test_empty_successful_authorization_payload_matches_app_sdk(self) -> None:
         fake = FakeBLEClient(authorization_result=None)
         await self._client(fake).set_server("wss://backend.example/")
         self.assertEqual(len(fake.actions), 4)
 
-    async def test_rejected_server_url_stops_before_companion_writes(self):
+    async def test_rejected_server_url_stops_before_companion_writes(self) -> None:
         fake = FakeBLEClient(reject_key="evb_ServerURL")
         with self.assertRaisesRegex(PROTOCOL.EVBoxProtocolError, "rejected: Rejected"):
             await self._client(fake).set_server("wss://backend.example/")
@@ -240,7 +242,7 @@ class ClientSessionTests(unittest.IsolatedAsyncioTestCase):
             ["evb_ServerURL"],
         )
 
-    async def test_reboot_required_server_url_continues_companion_writes(self):
+    async def test_reboot_required_server_url_continues_companion_writes(self) -> None:
         fake = FakeBLEClient(reboot_key="evb_ServerURL")
         await self._client(fake).set_server("wss://backend.example/")
         self.assertEqual(
@@ -256,7 +258,7 @@ class ClientSessionTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
 
-    async def test_rejected_rf_scan_does_not_leave_unhandled_marker_error(self):
+    async def test_rejected_rf_scan_does_not_leave_unhandled_marker_error(self) -> None:
         loop = asyncio.get_running_loop()
         unhandled = []
         previous_handler = loop.get_exception_handler()
@@ -272,7 +274,9 @@ class ClientSessionTests(unittest.IsolatedAsyncioTestCase):
             loop.set_exception_handler(previous_handler)
         self.assertEqual(unhandled, [])
 
-    async def test_esp32_transport_uses_separate_characteristics_and_128_bytes(self):
+    async def test_esp32_transport_uses_separate_characteristics_and_128_bytes(
+        self,
+    ) -> None:
         fake = FakeBLEClient(esp32=True)
         long_url = "wss://" + "a" * 200 + "/"
         await self._client(fake).set_server(long_url)
@@ -281,7 +285,7 @@ class ClientSessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertLessEqual(max(fake.write_sizes), CLIENT_MODULE.ESP32_CHUNK_SIZE)
         self.assertGreater(max(fake.write_sizes), CLIENT_MODULE.CHUNK_SIZE)
 
-    async def test_auto_start_enables_local_list_before_writing(self):
+    async def test_auto_start_enables_local_list_before_writing(self) -> None:
         fake = FakeBLEClient(local_auth_enabled=False)
         await self._client(fake).set_auto_start("999999")
         self.assertEqual(
@@ -299,7 +303,7 @@ class ClientSessionTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
 
-    async def test_auto_start_does_not_rewrite_enabled_local_list(self):
+    async def test_auto_start_does_not_rewrite_enabled_local_list(self) -> None:
         fake = FakeBLEClient(local_auth_enabled=True)
         await self._client(fake).set_auto_start("false")
         self.assertEqual(
@@ -313,7 +317,9 @@ class ClientSessionTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
 
-    async def test_unsupported_optional_configuration_key_does_not_break_setup(self):
+    async def test_unsupported_optional_configuration_key_does_not_break_setup(
+        self,
+    ) -> None:
         fake = FakeBLEClient(reject_get_key="evb_BootInfo")
         values = await self._client(fake).get_configuration(
             ["evb_MaximumStationCurrent", "evb_BootInfo"]
@@ -323,7 +329,7 @@ class ClientSessionTests(unittest.IsolatedAsyncioTestCase):
             {"evb_MaximumStationCurrent": "value-for-evb_MaximumStationCurrent"},
         )
 
-    async def test_malformed_optional_configuration_body_is_skipped(self):
+    async def test_malformed_optional_configuration_body_is_skipped(self) -> None:
         fake = FakeBLEClient(malformed_get_key="evb_BootInfo")
         values = await self._client(fake).get_configuration(
             ["evb_MaximumStationCurrent", "evb_BootInfo"]
@@ -333,7 +339,9 @@ class ClientSessionTests(unittest.IsolatedAsyncioTestCase):
             {"evb_MaximumStationCurrent": "value-for-evb_MaximumStationCurrent"},
         )
 
-    async def test_wifi_notification_wins_over_generic_direct_acknowledgement(self):
+    async def test_wifi_notification_wins_over_generic_direct_acknowledgement(
+        self,
+    ) -> None:
         fake = FakeBLEClient(
             wifi_direct_response=None,
             wifi_notification="7,Home,AA:BB:CC:DD:EE:FF,6,-52,192.0.2.2",
@@ -343,7 +351,7 @@ class ClientSessionTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(PROTOCOL.wifi_status(response)["status"], "connected")
 
-    async def test_wifi_direct_status_does_not_require_notification(self):
+    async def test_wifi_direct_status_does_not_require_notification(self) -> None:
         direct = "4,Home,AA:BB:CC:DD:EE:FF,6,-52"
         fake = FakeBLEClient(wifi_direct_response=direct)
         response = await self._client(fake).set_wifi(

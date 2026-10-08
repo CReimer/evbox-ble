@@ -3,11 +3,12 @@
 import json
 import unittest
 from datetime import time
+
 from evbox_ble import protocol as p
 
 
 class ProtocolBoundaryTests(unittest.TestCase):
-    def test_frames_and_json_reject_invalid_input(self):
+    def test_frames_and_json_reject_invalid_input(self) -> None:
         for raw in (b"[]", b"x[]", b"3[\xff]"):
             with self.subTest(raw=raw), self.assertRaises(p.EVBoxProtocolError):
                 p.FrameDecoder().feed(raw)
@@ -18,12 +19,10 @@ class ProtocolBoundaryTests(unittest.TestCase):
         for raw in ("invalid", "{}", "[]", '[3,"id",true]'):
             with self.subTest(raw=raw), self.assertRaises(p.EVBoxProtocolError):
                 p.parse_response(raw, "different")
-        for raw in ("invalid", "{}", '[2,"x","DataTransfer",{}]'):
-            if raw == "invalid":
-                with self.assertRaises(p.EVBoxProtocolError):
-                    p.data_transfer_event_details(raw)
-            else:
-                self.assertIsNone(p.data_transfer_event_details(raw))
+        with self.assertRaises(p.EVBoxProtocolError):
+            p.data_transfer_event_details("invalid")
+        for raw in ("{}", '[2,"x","DataTransfer",{}]'):
+            self.assertIsNone(p.data_transfer_event_details(raw))
         for value in ("[bad", "true", {"a": 1}, None):
             raw = json.dumps(
                 [2, "evt", "DataTransfer", {"messageId": "event", "data": value}]
@@ -40,7 +39,7 @@ class ProtocolBoundaryTests(unittest.TestCase):
         self.assertEqual(ctx.exception.description, "")
         self.assertEqual(p._csv_value([True, False]), "[true,false]")
 
-    def test_missing_and_legacy_configuration_values(self):
+    def test_missing_and_legacy_configuration_values(self) -> None:
         self.assertEqual(
             p.configuration_values(
                 {"configurationKey": [None, {}, {"key": "x", "value": "maybe"}]}
@@ -80,7 +79,7 @@ class ProtocolBoundaryTests(unittest.TestCase):
         self.assertEqual(p.led_configuration("invalid"), {})
         self.assertEqual(p.led_configuration("On,a,b,bad"), {})
 
-    def test_scan_and_connection_data_defensively_parse_partial_records(self):
+    def test_scan_and_connection_data_defensively_parse_partial_records(self) -> None:
         for value in (None, 42, b"bad", [], [None, {}, {"ssid": ""}, {"ssid": 42}]):
             self.assertEqual(p.wifi_scan_networks(value), [])
         self.assertEqual(

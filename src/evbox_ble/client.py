@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable, Iterable, Mapping
-from contextlib import asynccontextmanager, suppress
 import logging
-from typing import Any
+from collections.abc import AsyncIterator, Callable, Iterable, Mapping
+from contextlib import asynccontextmanager, suppress
+from typing import Any, cast
 
-from bleak_retry_connector import BleakClientWithServiceCache, establish_connection
 from bleak.backends.device import BLEDevice
+from bleak_retry_connector import BleakClientWithServiceCache, establish_connection
 
 from .const import (
     CHARACTERISTIC_UUID,
@@ -18,8 +18,8 @@ from .const import (
     ESP32_CHUNK_SIZE,
     ESP32_NOTIFY_UUID,
     ESP32_WRITE_UUID,
-    KEY_CONNECTOR_LIST,
     KEY_AUTO_START,
+    KEY_CONNECTOR_LIST,
     KEY_LOCAL_AUTH_LIST_ENABLED,
     KEY_SERIAL_AS_CONNECTOR_ID,
     KEY_SERVER_URL,
@@ -28,17 +28,17 @@ from .const import (
 from .protocol import (
     EVBoxProtocolError,
     FrameDecoder,
+    backend_companion_values,
     build_data_transfer,
     build_ocpp_call,
     build_ocpp_call_result,
-    backend_companion_values,
     chunks,
-    configuration_values,
     configuration_boolean,
-    parse_response,
-    parse_event_payload,
+    configuration_values,
     connection_information,
     data_transfer_event_details,
+    parse_event_payload,
+    parse_response,
     satellite_scan_results,
     wifi_status,
 )
@@ -76,19 +76,10 @@ class _ResponseRouter:
                     # Unsolicited firmware events are valid but do not answer a
                     # pending command and must not poison the BLE session.
                     continue
-                matched_event = False
                 for marker, marker_future in self._markers.items():
                     if marker in message and not marker_future.done():
                         marker_future.set_result(parse_event_payload(message, marker))
-                        matched_event = True
-                try:
-                    response = parse_response(message)
-                except EVBoxProtocolError:
-                    # Firmware sends Wi-Fi/RF/connection events as OCPP CALLs,
-                    # not CALLRESULTs. They are complete once routed above.
-                    if matched_event:
-                        continue
-                    raise
+                response = parse_response(message)
                 future = self._pending.get(response.message_id)
                 if future is not None and not future.done():
                     future.set_result(response.payload)
@@ -118,6 +109,11 @@ class _ResponseRouter:
         """Remove a marker and consume an error set before it was awaited."""
         if self._markers.get(marker) is future:
             self._markers.pop(marker, None)
+        self._finish_future(future)
+
+    @staticmethod
+    def _finish_future(future: asyncio.Future[Any]) -> None:
+        """Cancel pending work or retrieve an error before dropping its last owner."""
         if not future.done():
             future.cancel()
         elif not future.cancelled():
@@ -171,6 +167,9 @@ class _ResponseRouter:
                 return direct_value
         finally:
             self._pending.pop(request_id, None)
+            self._finish_future(future)
+            if marker_future is not None:
+                self._finish_future(marker_future)
             if response_marker:
                 self._markers.pop(response_marker, None)
 
@@ -193,7 +192,7 @@ class EVBoxClient:
         self.address = address
         self._security_code = security_code
         self._lock = asyncio.Lock()
-        self._transaction_owner: asyncio.Task | None = None
+        self._transaction_owner: asyncio.Task[Any] | None = None
 
     async def _connect(self) -> BleakClientWithServiceCache:
         device = self._ble_device_callback()
@@ -287,7 +286,7 @@ class EVBoxClient:
             raise EVBoxAuthError("EVBox security code was rejected")
 
     @asynccontextmanager
-    async def transaction(self):
+    async def transaction(self) -> AsyncIterator[None]:
         """Serialize a complete operation, allowing sessions in the owning task."""
         task = asyncio.current_task()
         if self._transaction_owner is task:
@@ -566,7 +565,9 @@ class EVBoxClient:
 
     async def connection_info(self) -> dict[str, Any]:
         """Request the asynchronous connection information shown by the app."""
-        return (await self.session([("connection_info", "", None)]))[0]
+        return cast(
+            dict[str, Any], (await self.session([("connection_info", "", None)]))[0]
+        )
 
     async def set_wifi(self, values: Iterable[Any]) -> Any:
         """Set Wi-Fi and accept both response IDs used by Elvi firmware."""
@@ -574,4 +575,6 @@ class EVBoxClient:
 
     async def scan_satellites(self, timeout: int = 40) -> list[dict[str, Any]]:
         """Run RF scan and wait for the asynchronous result list."""
-        return (await self.session([("rf_scan", "", timeout)]))[0]
+        return cast(
+            list[dict[str, Any]], (await self.session([("rf_scan", "", timeout)]))[0]
+        )

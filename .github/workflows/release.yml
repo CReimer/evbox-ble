@@ -15,9 +15,18 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
-      - run: python -m pip install '.[test]'
+      - run: python -m pip install '.[test,quality]'
+      - run: ruff check src tests tools
+      - run: ruff format --check src tests tools
+      - run: mypy
       - run: python -m coverage run -m unittest discover -s tests -v
-      - run: python -m coverage report --fail-under=95
+      - run: python -m coverage report
+      - run: python -m coverage json
+      - run: python tools/check_coverage.py coverage.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-python-${{ matrix.python }}
+          path: coverage.json
   build:
     needs: test
     runs-on: ubuntu-latest
@@ -36,8 +45,44 @@ jobs:
         with:
           name: distributions
           path: dist/
-  publish:
+  verify-distributions:
     needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.14"]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+      - name: Test the release wheel
+        run: |
+          python -m pip install coverage build dist/*.whl
+          python -c "import importlib.util, importlib.resources; assert importlib.util.find_spec('homeassistant') is None; assert importlib.resources.files('evbox_ble').joinpath('py.typed').is_file()"
+          python -m coverage run -m unittest discover -s tests -v
+          python -m coverage report
+          python -m coverage json
+          python tools/check_coverage.py coverage.json
+      - name: Rebuild and test the source distribution in a fresh environment
+        run: |
+          mkdir sdist-source
+          tar -xzf dist/*.tar.gz -C sdist-source --strip-components=1
+          python -m build --wheel --outdir rebuilt sdist-source
+          python -m venv .artifact-venv
+          VERIFY_ENV="$PWD/.artifact-venv"
+          "$VERIFY_ENV/bin/python" -m pip install coverage rebuilt/*.whl
+          cd sdist-source
+          "$VERIFY_ENV/bin/python" -m coverage run -m unittest discover -s tests -v
+          "$VERIFY_ENV/bin/python" -m coverage report
+          "$VERIFY_ENV/bin/python" -m coverage json
+          "$VERIFY_ENV/bin/python" tools/check_coverage.py coverage.json
+  publish:
+    needs: verify-distributions
     if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
     runs-on: ubuntu-latest
     environment: pypi

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
-from datetime import datetime, time as dt_time, timezone
 import json
 import re
 import time
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from datetime import time as dt_time
 from typing import Any
 
 
@@ -59,7 +60,7 @@ def firmware_update_payload(
     url: str, now: datetime | None = None
 ) -> dict[str, str | int]:
     """Build the exact UpdateFirmware payload emitted by EVBox Connect."""
-    current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    current = (now or datetime.now(UTC)).astimezone(UTC)
     # The app deliberately uses a fixed year in its SimpleDateFormat pattern.
     retrieve_date = (
         current.strftime("2000-%m-%dT%H:%M:%S.") + f"{current.microsecond // 1000:03d}Z"
@@ -473,14 +474,14 @@ def wifi_scan_networks(value: Any) -> list[dict[str, Any]]:
                 if len(parts) < 8 or not parts[0]:
                     continue
 
-                def integer(index: int) -> int | None:
+                def integer(raw_value: str) -> int | None:
                     try:
-                        return int(parts[index])
+                        return int(raw_value)
                     except (ValueError, TypeError):
                         return None
 
-                def values(index: int) -> list[str]:
-                    item = parts[index].strip()
+                def values(raw_value: str) -> list[str]:
+                    item = raw_value.strip()
                     if item.startswith("[") and item.endswith("]"):
                         item = item[1:-1]
                     return [
@@ -493,12 +494,12 @@ def wifi_scan_networks(value: Any) -> list[dict[str, Any]]:
                     {
                         "ssid": parts[0],
                         "macAddress": parts[1],
-                        "channel": integer(2),
+                        "channel": integer(parts[2]),
                         "mode": parts[3] or None,
-                        "rssi": integer(4),
-                        "authentication": values(5),
-                        "unicast_ciphers": values(6),
-                        "group_ciphers": values(7),
+                        "rssi": integer(parts[4]),
+                        "authentication": values(parts[5]),
+                        "unicast_ciphers": values(parts[6]),
+                        "group_ciphers": values(parts[7]),
                     }
                 )
             value = records
@@ -526,17 +527,12 @@ def wifi_scan_networks(value: Any) -> list[dict[str, Any]]:
                     network[name] = item[key]
                     break
         result.append(network)
-    return sorted(
-        result,
-        key=lambda network: (
-            -(
-                network.get("signal_strength")
-                if isinstance(network.get("signal_strength"), int)
-                else -999
-            ),
-            network["ssid"],
-        ),
-    )
+
+    def sort_key(network: dict[str, Any]) -> tuple[int, str]:
+        strength = network.get("signal_strength")
+        return -(strength if isinstance(strength, int) else -999), network["ssid"]
+
+    return sorted(result, key=sort_key)
 
 
 def meter_configuration(value: Any) -> dict[str, Any]:

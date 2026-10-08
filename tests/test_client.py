@@ -1,15 +1,16 @@
 """BLE boundary failures and notification races without Bluetooth hardware."""
 
 import asyncio
-from types import SimpleNamespace as NS
 import unittest
+from types import SimpleNamespace as NS
 from unittest.mock import AsyncMock, Mock, patch
+
 from evbox_ble import client as c
 from evbox_ble.protocol import frame_message
 
 
 class ClientTests(unittest.IsolatedAsyncioTestCase):
-    async def test_device_provider_is_refreshed_and_errors_are_wrapped(self):
+    async def test_device_provider_is_refreshed_and_errors_are_wrapped(self) -> None:
         provider = Mock(return_value=None)
         client = c.EVBoxClient("AA", "123", ble_device_callback=provider)
         with self.assertRaisesRegex(c.EVBoxConnectionError, "proxy"):
@@ -25,7 +26,7 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
                 await client._connect()
         self.assertEqual(provider.call_count, 3)
 
-    async def test_notification_markers_timeout_and_pending_failure(self):
+    async def test_notification_markers_timeout_and_pending_failure(self) -> None:
         router = c._ResponseRouter()
         future = router.expect_marker("evbRFScan")
         router.notification(
@@ -64,7 +65,9 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
             await router.wait_for_marker("late", marker, 0.001)
         self.assertNotIn("late", router._markers)
 
-    async def test_request_falls_back_to_ack_when_no_final_wifi_event_arrives(self):
+    async def test_request_falls_back_to_ack_when_no_final_wifi_event_arrives(
+        self,
+    ) -> None:
         router = c._ResponseRouter()
 
         async def write(*args, **kwargs):
@@ -88,7 +91,7 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
                 )
         self.assertEqual(router._markers, {})
 
-    async def test_session_optional_failures_scan_and_cleanup(self):
+    async def test_session_optional_failures_scan_and_cleanup(self) -> None:
         client = c.EVBoxClient("AA", "123", ble_device_callback=lambda: None)
         ble = NS(
             services=NS(get_characteristic=Mock(return_value=None)),
@@ -133,7 +136,9 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
             await client.session([])
         self.assertGreater(ble.disconnect.await_count, 0)
 
-    async def test_configuration_skips_missing_and_invalid_optional_values(self):
+    async def test_configuration_skips_missing_and_invalid_optional_values(
+        self,
+    ) -> None:
         client = c.EVBoxClient("AA", "123", ble_device_callback=lambda: None)
         client.session = AsyncMock(
             return_value=[
