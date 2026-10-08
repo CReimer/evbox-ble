@@ -1,7 +1,9 @@
-.venv/
+.venv*/
 __pycache__/
 .coverage
 coverage*.json
 htmlcov/
 dist/
 *.log
+ci-dist/
+.tools/
