@@ -1,6 +1,6 @@
 # EVBox BLE
 
-Prepared library extraction for Home Assistant Core consideration. This package is not yet published on PyPI and is not used by the released HACS integration.
+Library extraction for Home Assistant Core consideration. This package is not yet published on PyPI and is not used by the released HACS integration. Source and CI are maintained at [CReimer/evbox-ble](https://github.com/CReimer/evbox-ble); report library defects in its issue tracker.
 
 Asynchronous local BLE sessions for EVBox Gen4 chargers, including authentication, configuration and the legacy EVBox/OCPP framing protocol. The protocol and client originate in the Apache-2.0 project [CReimer/evbox-g4-ble](https://github.com/CReimer/evbox-g4-ble), revision `5fbeec3dddbc107deac87a46f12b670b4ca3f264`. No vendor applications or firmware are included.
 
